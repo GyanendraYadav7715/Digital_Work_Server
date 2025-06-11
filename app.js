@@ -7,6 +7,12 @@ const cors = require('cors');
 const dotenv = require("dotenv")
 const requestLogger = require("./middlewares/requestLogger");
 const connectiontoMogodbcluster = require("./configuration/database")
+
+//routes
+const authroute = require("./routes/auth.route")
+
+
+
 dotenv.config();
 const app = express();
 const allowedOrigins = ['http://localhost:5173'];
@@ -33,6 +39,8 @@ connectiontoMogodbcluster();
 app.get("/", (req, res) => {
   res.send("server is running!")
 })
+
+app.use("/api/v1/", authroute)
 
 
 app.use(function (req, res, next) {
