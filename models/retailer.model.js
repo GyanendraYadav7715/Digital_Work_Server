@@ -31,8 +31,8 @@ const retailerSchema = new mongoose.Schema({
         required: true
     },
     balance: {
-        type:Number,
-        default:0
+        type: Number,
+        default: 0
     },
     created_at: {
         type: Date,
@@ -45,6 +45,10 @@ const retailerSchema = new mongoose.Schema({
     redirect: {
         type: String,
         default: "/retailer",
+    },
+    location: {
+        lat: { type: Number, default: 0 },
+        lng: { type: Number, default: 0 },
     },
 
 

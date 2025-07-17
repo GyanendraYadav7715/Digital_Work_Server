@@ -9,7 +9,8 @@ const requestLogger = require("./middlewares/requestLogger");
 const connectiontoMogodbcluster = require("./configuration/database")
 
 //routes
-const authroute = require("./routes/auth.route")
+const adminRoutes = require("./routes/admin.routes");
+const authRoute = require("./routes/auth.route")
 
 
 
@@ -40,7 +41,8 @@ app.get("/", (req, res) => {
   res.send("server is running!")
 })
 
-app.use("/api/v1/", authroute)
+app.use("/api/v1/admin", adminRoutes)
+app.use("/api/v1/auth", authRoute)
 
 
 app.use(function (req, res, next) {

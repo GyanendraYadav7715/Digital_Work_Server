@@ -26,7 +26,10 @@ const adminSchema = new mongoose.Schema({
         type: String,
         default: "/superadmin",
     },
-
+    location: {
+        lat: { type: Number, default: 0 },
+        lng: { type: Number, default: 0 },
+    },
 
 })
 
