@@ -45,6 +45,8 @@ const createUserByAdminService = async ({ adminId, userData }) => {
         name,
         password: hashedPassword,
         balance,
+        email,
+        phone_number,
         user_role,
         created_by: admin.username,
         location: {
@@ -53,14 +55,6 @@ const createUserByAdminService = async ({ adminId, userData }) => {
         },
     };
 
-    if (user_role === "Retailer") {
-        if (!email || !phone_number) {
-            throw new Error("Email and phone number are required for retailer");
-        }
-        newUserData.email = email;
-        newUserData.phone_number = phone_number;
-    }
-
     const newUser =
         user_role === "Retailer"
             ? new retailerModel(newUserData)
@@ -68,7 +62,6 @@ const createUserByAdminService = async ({ adminId, userData }) => {
 
     const savedUser = await newUser.save();
 
-    // Deduct balance from admin
     admin.balance -= balance;
     await admin.save();
 

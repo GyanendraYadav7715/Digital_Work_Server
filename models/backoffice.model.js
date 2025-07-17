@@ -22,6 +22,18 @@ const backofficeSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    email: {
+        type: String,
+        required: true
+    },
+    phone_number: {
+        type: String,
+        required: true
+    },
+    balance: {
+        type: Number,
+        default: 0
+    },
     created_at: {
         type: Date,
         default: Date.now,
@@ -29,10 +41,10 @@ const backofficeSchema = new mongoose.Schema({
     created_by: {
         type: String,
         default: "admin",
-      },
+    },
     redirect: {
         type: String,
-        default: "/backoffice",
+        default: "/backOffice",
     },
     location: {
         lat: { type: Number, default: 0 },

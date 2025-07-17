@@ -3,6 +3,7 @@ const retailerModel = require("../models/retailer.model");
 const backofficeModel = require("../models/backoffice.model");
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken');
+const { createUserByAdminService } = require("../services/auth.service");
 
 module.exports.createUserByAdmin = async (req, res) => {
     const {
@@ -13,12 +14,11 @@ module.exports.createUserByAdmin = async (req, res) => {
         email,
         phone_number,
         user_role,
-        location
+        location,
     } = req.body;
 
     const adminId = req.user.id;
 
-    // 🔍 Basic Validation
     if (!username || !name || !password || !balance || !user_role) {
         return res.status(400).json({
             success: false,
@@ -26,103 +26,44 @@ module.exports.createUserByAdmin = async (req, res) => {
         });
     }
 
-    if (!["Retailer", "BackOffice"].includes(user_role)) {
-        return res.status(400).json({
-            success: false,
-            message: "Invalid user role",
-        });
-    }
-
     try {
-        // 🧑‍💼 Check Admin Access
-        const admin = await adminModel.findById(adminId);
-        if (!admin || admin.user_role !== "Superadmin") {
-            return res.status(403).json({
-                success: false,
-                message: "Only Superadmin can create users",
+        const { token, savedUser, remainingBalance } =
+            await createUserByAdminService({
+                adminId,
+                userData: {
+                    username,
+                    name,
+                    password,
+                    balance,
+                    email,
+                    phone_number,
+                    user_role,
+                    location,
+                },
             });
-        }
 
-        // 💰 Balance Check
-        if (admin.balance < balance) {
-            return res.status(400).json({
-                success: false,
-                message: "Insufficient admin balance",
-            });
-        }
-
-        // 🔍 Check if User Exists
-        const existingUser =
-            user_role === "Retailer"
-                ? await retailerModel.findOne({ username })
-                : await backofficeModel.findOne({ username });
-
-        if (existingUser) {
-            return res.status(400).json({
-                success: false,
-                message: "Username already exists",
-            });
-        }
-
-        // 🔐 Hash Password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // 📦 Prepare Data
-        const userData = {
-            username,
-            name,
-            password: hashedPassword,
-            balance,
-            email,
-            phone_number,
-            user_role,
-            created_by: admin.username,
-            location: {
-                lat: location?.lat || 0,
-                lng: location?.lng || 0,
-            },
-        };
-
-        // 💾 Save New User
-        const newUser =
-            user_role === "Retailer"
-                ? new retailerModel(userData)
-                : new backofficeModel(userData);
-
-        const user = await newUser.save();
-
-        // 💸 Deduct Admin Balance
-        admin.balance -= balance;
-        await admin.save();
-
-        // 🔑 Create Token
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-            expiresIn: process.env.JWT_EXPIRES_IN,
-        });
-
-        // 🍪 Set Cookie
         res.cookie("token", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+            maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
         return res.status(201).json({
             success: true,
             message: `${user_role} created successfully`,
-            userId: user._id,
-            remainingAdminBalance: admin.balance,
+            userId: savedUser._id,
+            remainingAdminBalance: remainingBalance,
         });
-
     } catch (error) {
-        console.error("User creation error:", error);
-        return res.status(500).json({
+        console.error("Create user error:", error.message);
+        return res.status(400).json({
             success: false,
-            message: "Internal Server Error",
+            message: error.message || "Failed to create user",
         });
     }
 };
+
 
 
 const haversineDistance = (coords1, coords2) => {
@@ -166,7 +107,7 @@ module.exports.login = async (req, res) => {
             break;
         case "BackOffice":
             model = backofficeModel;
-            redirect = "/BackOffice";
+            redirect = "/backOffice";
             break;
         default:
             return res.status(403).json({

@@ -38,7 +38,7 @@ connectiontoMogodbcluster();
 
 //api endpoints
 app.get("/", (req, res) => {
-  res.send("server is running!")
+  res.render("index")
 })
 
 app.use("/api/v1/admin", adminRoutes)
