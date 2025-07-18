@@ -53,9 +53,6 @@ module.exports.createUserByAdmin = async (req, res) => {
         });
     }
 };
-
-
-
 module.exports.login = async (req, res) => {
     try {
         const result = await loginService(req.body);
@@ -73,3 +70,5 @@ module.exports.login = async (req, res) => {
         });
     }
 };
+module.exports.deleteUser = async (req, res) => { }
+module.exports.changeStatus = async (req, res) => { }

@@ -61,8 +61,6 @@ const createUserByAdminService = async ({ adminId, userData }) => {
 
     return { savedUser, remainingBalance: admin.balance };
 };
-
- 
 const loginService = async ({ username, password, user_role, latitude, longitude }) => {
     
     if (!username || !password || !user_role || latitude == null || longitude == null) {
@@ -115,7 +113,7 @@ const loginService = async ({ username, password, user_role, latitude, longitude
                     status: 403,
                     body: {
                         success: false,
-                        message: "Access denied. You moved outside your 50m login zone. Account blocked.",
+                        message: "Access denied. You moved outside your 20m login zone. Account blocked.",
                     },
                 };
             }
@@ -145,8 +143,14 @@ const loginService = async ({ username, password, user_role, latitude, longitude
         },
     };
 };
+const deleteUserService = async()=>{
+}
+const changeStatusService =async()=> {
+}
 
 module.exports = {
     createUserByAdminService,
     loginService,
+    deleteUserService,
+    changeStatusService
 };
