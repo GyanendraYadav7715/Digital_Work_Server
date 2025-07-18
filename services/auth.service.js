@@ -1,24 +1,13 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-
 const adminModel = require("../models/admin.model");
-const retailerModel = require("../models/retailer.model");
-const backofficeModel = require("../models/backoffice.model");
-
-
-const getModelByRole = require("../utils/getModelByRole");
-const {haversineDistance} = require("../utils/haversine");
+const{ getModelByRole, getUserModel} = require("../utils/getModelByRole");
+const { haversineDistance } = require("../utils/haversine");
 
 const createUserByAdminService = async ({ adminId, userData }) => {
     const {
-        username,
-        name,
-        password,
-        balance,
-        email,
-        phone_number,
-        user_role,
-        location,
+        username, name, password, balance, email, phone_number,
+        user_role, location = {}
     } = userData;
 
     if (!["Retailer", "BackOffice"].includes(user_role)) {
@@ -34,18 +23,21 @@ const createUserByAdminService = async ({ adminId, userData }) => {
         throw new Error("Insufficient admin balance");
     }
 
-    const existingUser =
-        user_role === "Retailer"
-            ? await retailerModel.findOne({ username })
-            : await backofficeModel.findOne({ username });
+    const UserModel = getUserModel(user_role);
+    if (!UserModel) throw new Error("Invalid role model");
+
+    const existingUser = await UserModel.findOne({
+        $or: [{ username }, { email }, { phone_number }],
+    });
 
     if (existingUser) {
-        throw new Error("Username already exists");
+        throw new Error("Username, email, or phone number already exists");
     }
+
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUserData = {
+    const newUser = new UserModel({
         username,
         name,
         password: hashedPassword,
@@ -55,36 +47,37 @@ const createUserByAdminService = async ({ adminId, userData }) => {
         user_role,
         created_by: admin.username,
         location: {
-            lat: location?.lat || 0,
-            lng: location?.lng || 0,
+            lat: location.lat || 0,
+            lng: location.lng || 0,
         },
-    };
-
-    const newUser =
-        user_role === "Retailer"
-            ? new retailerModel(newUserData)
-            : new backofficeModel(newUserData);
+    });
 
     const savedUser = await newUser.save();
 
     admin.balance -= balance;
     await admin.save();
 
-    const token = jwt.sign({ id: savedUser._id }, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRES_IN,
-    });
+     
 
-    return { token, savedUser, remainingBalance: admin.balance };
+    return { savedUser, remainingBalance: admin.balance };
 };
 
+ 
 const loginService = async ({ username, password, user_role, latitude, longitude }) => {
+    
     if (!username || !password || !user_role || latitude == null || longitude == null) {
-        return { status: 400, body: { success: false, message: "All fields including location are required" } };
+        return {
+            status: 400,
+            body: { success: false, message: "All fields including location are required" },
+        };
     }
 
     const roleData = getModelByRole(user_role);
     if (!roleData) {
-        return { status: 403, body: { success: false, message: "Invalid user role" } };
+        return {
+            status: 403,
+            body: { success: false, message: "Invalid user role" },
+        };
     }
 
     const { model, redirect } = roleData;
@@ -103,7 +96,7 @@ const loginService = async ({ username, password, user_role, latitude, longitude
         return { status: 401, body: { success: false, message: "Invalid password" } };
     }
 
-    // Location check for retailer
+    // Retailer-specific location check
     if (user_role === "Retailer") {
         const currentCoords = { lat: latitude, lng: longitude };
         const savedCoords = user.location || { lat: 0, lng: 0 };
@@ -140,7 +133,7 @@ const loginService = async ({ username, password, user_role, latitude, longitude
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-            maxAge: 7 * 24 * 60 * 60 * 1000,
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         },
         body: {
             success: true,
@@ -153,10 +146,7 @@ const loginService = async ({ username, password, user_role, latitude, longitude
     };
 };
 
- 
-
-
 module.exports = {
     createUserByAdminService,
-    loginService
+    loginService,
 };

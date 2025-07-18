@@ -11,4 +11,12 @@ const getModelByRole = (role) => {
     }
 };
 
-module.exports = getModelByRole;
+const getUserModel = (role) => {
+    switch (role) {
+        case "Retailer": return retailerModel;
+        case "BackOffice": return backofficeModel;
+        default: return null;
+    }
+};
+
+module.exports = { getModelByRole, getUserModel };
