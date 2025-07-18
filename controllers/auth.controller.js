@@ -4,6 +4,7 @@ const backofficeModel = require("../models/backoffice.model");
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken');
 const { createUserByAdminService } = require("../services/auth.service");
+const {haversineDistance} = require("../utils/haversine")
 
 module.exports.createUserByAdmin = async (req, res) => {
     const {
@@ -65,58 +66,35 @@ module.exports.createUserByAdmin = async (req, res) => {
 };
 
 
-
-const haversineDistance = (coords1, coords2) => {
-    const toRad = (x) => (x * Math.PI) / 180;
-    const R = 6371e3; // in meters
-
-    const dLat = toRad(coords2.lat - coords1.lat);
-    const dLng = toRad(coords2.lng - coords1.lng);
-
-    const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(coords1.lat)) *
-        Math.cos(toRad(coords2.lat)) *
-        Math.sin(dLng / 2) ** 2;
-
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+const getModelByRole = (role) => {
+    switch (role) {
+        case "Superadmin": return { model: adminModel, redirect: "/superadmin" };
+        case "Retailer": return { model: retailerModel, redirect: "/retailer" };
+        case "BackOffice": return { model: backofficeModel, redirect: "/backOffice" };
+        default: return null;
+    }
 };
 
 module.exports.login = async (req, res) => {
     const { username, password, user_role, latitude, longitude } = req.body;
-
-    if (!username || !password || !user_role || latitude === undefined || longitude === undefined) {
+ 
+    if (!username || !password || !user_role || latitude == null || longitude == null) {
         return res.status(400).json({
             success: false,
             message: "All fields including location are required",
         });
     }
 
-    let model;
-    let redirect;
-
-    switch (user_role) {
-        case "Superadmin":
-            model = adminModel;
-            redirect = "/superadmin";
-            break;
-        case "Retailer":
-            model = retailerModel;
-            redirect = "/retailer";
-            break;
-        case "BackOffice":
-            model = backofficeModel;
-            redirect = "/backOffice";
-            break;
-        default:
-            return res.status(403).json({
-                success: false,
-                message: "Invalid user role",
-            });
+    const roleData = getModelByRole(user_role);
+    if (!roleData) {
+        return res.status(403).json({
+            success: false,
+            message: "Invalid user role",
+        });
     }
 
     try {
+        const { model, redirect } = roleData;
         const user = await model.findOne({ username, user_role });
 
         if (!user) {
@@ -132,20 +110,19 @@ module.exports.login = async (req, res) => {
             return res.status(401).json({ success: false, message: "Invalid password" });
         }
 
-        // Location check only for Retailers
+        // 📍 Retailer Location Enforcement
         if (user_role === "Retailer") {
             const currentCoords = { lat: latitude, lng: longitude };
             const savedCoords = user.location || { lat: 0, lng: 0 };
 
             if (savedCoords.lat === 0 && savedCoords.lng === 0) {
-                // First login – save location
                 user.location = currentCoords;
                 await user.save();
             } else {
                 const distance = haversineDistance(savedCoords, currentCoords);
-                console.log(`📍 Distance from previous login: ${distance} meters`);
+                console.log(`📍 Distance from previous login: ${distance.toFixed(2)} meters`);
 
-                if (distance > 50) {
+                if (distance > 20) {
                     user.isUserblocked = true;
                     await user.save();
                     return res.status(403).json({
@@ -156,12 +133,10 @@ module.exports.login = async (req, res) => {
             }
         }
 
-        // ✅ Token creation
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
             expiresIn: process.env.JWT_EXPIRES_IN,
         });
 
-        // Set token in cookie (optional)
         res.cookie("token", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
@@ -177,6 +152,7 @@ module.exports.login = async (req, res) => {
             name: user.name,
             token,
         });
+
     } catch (error) {
         console.error("Login error:", error);
         return res.status(500).json({
@@ -185,6 +161,7 @@ module.exports.login = async (req, res) => {
         });
     }
 };
+
 
 
 
